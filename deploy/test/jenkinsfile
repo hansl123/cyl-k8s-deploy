@@ -1,0 +1,41 @@
+pipeline {
+    agent {
+        node {
+            label 'maven'
+        }
+
+    }
+
+//    提前配置 凭证：cyl-gitlab、aliyun-jxid、kubeconfig
+//    可编辑变量：
+//          VERSION:镜像版本
+
+    environment{
+        //项目名称
+        APP_NAME = "项目名称"
+        //git地址
+        GIT_URL = "http://10.0.41.242:8088/cyl-project/"
+
+        //git凭证
+        GIT_ID = "cyl-gitlab"
+        //k8s集群凭证
+        KUBE_CONFIG_ID = "kubeconfig"
+        //部署文件路径
+        DEPLOY_PATH = "deploy/test/deployment.yaml"
+    }
+
+    stages {
+
+        stage('Clone YAML') {
+            steps {
+                git(url: "$GIT_URL"+'cyl-k8s-deploy.git', credentialsId: "$GIT_ID", branch: 'master', changelog: true, poll: false)
+            }
+        }
+
+        stage('Deploy to Test') {
+            steps {
+                kubernetesDeploy(enableConfigSubstitution: true, deleteResource: false, kubeconfigId: "$KUBE_CONFIG_ID", configs: "$DEPLOY_PATH")
+            }
+        }
+    }
+}

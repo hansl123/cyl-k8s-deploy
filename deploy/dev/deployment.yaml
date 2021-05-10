@@ -1,0 +1,64 @@
+﻿kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: $APP_NAME-dev
+  namespace: cyl-dev
+  labels:
+    app: $APP_NAME-dev
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: $APP_NAME-dev
+  template:
+    metadata:
+      labels:
+        app: $APP_NAME-dev
+      annotations:
+        cyl.com/buildNumber: $BUILD_NUMBER
+    spec:
+      volumes:
+      - name: host-time
+        hostPath:
+          path: /etc/localtime
+          type: ''
+      containers:
+      - name: $APP_NAME-dev
+        image: registry.cn-hangzhou.aliyuncs.com/cyl-dev/$APP_NAME:$VERSION
+        env:
+        - name: KAFKA_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: cyl-project-evn
+              key: KAFKA_HOST
+        - name: KAFKA_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: cyl-project-evn
+              key: KAFKA_PORT
+        - name: NACOS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: cyl-project-evn
+              key: NACOS_HOST
+        - name: NACOS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: cyl-project-evn
+              key: NACOS_PORT
+        volumeMounts:
+        - name: host-time
+          readOnly: true
+          mountPath: /etc/localtime
+        imagePullPolicy: Always
+      restartPolicy: Always
+      imagePullSecrets:
+      - name: ali-cyl-test
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600

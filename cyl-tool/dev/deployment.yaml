@@ -1,0 +1,62 @@
+﻿kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: cyl-tool-dev
+  namespace: cyl-dev
+  labels:
+    app: cyl-tool-dev
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cyl-tool-dev
+  template:
+    metadata:
+      labels:
+        app: cyl-tool-dev
+    spec:
+      volumes:
+      - name: host-time
+        hostPath:
+          path: /etc/localtime
+          type: ''
+      containers:
+      - name: cyl-tool-dev
+        image: registry.cn-hangzhou.aliyuncs.com/cyl-dev/cyl-tool:$VERSION
+        env:
+        - name: KAFKA_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: cyl-project-evn
+              key: KAFKA_HOST
+        - name: KAFKA_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: cyl-project-evn
+              key: KAFKA_PORT
+        - name: NACOS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: cyl-project-evn
+              key: NACOS_HOST
+        - name: NACOS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: cyl-project-evn
+              key: NACOS_PORT
+        volumeMounts:
+        - name: host-time
+          readOnly: true
+          mountPath: /etc/localtime
+        imagePullPolicy: Always
+      restartPolicy: Always
+      imagePullSecrets:
+      - name: ali-cyl-test
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600

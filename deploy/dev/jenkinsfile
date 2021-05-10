@@ -1,0 +1,68 @@
+pipeline {
+    agent {
+        node {
+            label 'maven'
+        }
+
+    }
+
+//    提前配置 凭证：cyl-gitlab、aliyun-jxid、kubeconfig
+//    可编辑变量：
+//          VERSION:镜像版本
+//          BRANCH:分支
+
+    environment{
+        //项目名称
+        APP_NAME = "项目名称"
+        //git地址
+        GIT_URL = "http://10.0.41.242:8088/cyl-project/"
+        //镜像仓库
+        REGISTRY = "registry.cn-hangzhou.aliyuncs.com"
+        //镜像仓库空间名
+        DOCKERHUB_NAMESPACE = "cyl-dev"
+
+        //git凭证
+        GIT_ID = "cyl-gitlab"
+        //阿里云镜像仓库凭证ID
+        ALIYUN_JXID = "aliyun-jxid"
+        //k8s集群凭证
+        KUBE_CONFIG_ID = "kubeconfig"
+        //部署文件路径
+        DEPLOY_PATH = "deploy/dev/deployment.yaml"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git(url: "$GIT_URL"+"$APP_NAME"+'.git', credentialsId: "$GIT_ID", branch: '$BRANCH', changelog: true, poll: false)
+            }
+        }
+        stage('Build and Push') {
+            steps {
+                container('maven') {
+                    sh 'mvn clean package -DskipTests'
+                    sh '''docker build -f Dockerfile -t $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:$VERSION .
+'''
+                    withCredentials([usernamePassword(credentialsId : "$ALIYUN_JXID" ,passwordVariable : 'DOCKER_PASSWORD' ,usernameVariable : 'DOCKER_USERNAME' ,)]) {
+                        sh 'echo "$DOCKER_PASSWORD" | docker login $REGISTRY -u "$DOCKER_USERNAME" --password-stdin'
+                        sh '''docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:$VERSION
+'''
+                    }
+
+                }
+
+            }
+        }
+        stage('Clone YAML') {
+            steps {
+                git(url: "$GIT_URL"+'cyl-k8s-deploy.git', credentialsId: "$GIT_ID", branch: 'master', changelog: true, poll: false)
+            }
+        }
+
+        stage('Deploy to Dev') {
+            steps {
+                kubernetesDeploy(enableConfigSubstitution: true, deleteResource: false, kubeconfigId: "$KUBE_CONFIG_ID", configs: "$DEPLOY_PATH")
+            }
+        }
+    }
+}
